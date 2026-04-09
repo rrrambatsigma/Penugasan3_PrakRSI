@@ -21,5 +21,6 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 class UserPatch(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    whatsapp: Optional[str] = None

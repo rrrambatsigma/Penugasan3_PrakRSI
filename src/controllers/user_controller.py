@@ -35,11 +35,11 @@ def delete_user(user_id: int, db: Session = Depends(get_session)):
     return delete_user_service(db, user_id)
 
 def search_users(
-    name: Optional[str] = Query(None),
-    email: Optional[str] = Query(None),
+    first_name: Optional[str] = Query(None),
+    whatsapp: Optional[str] = Query(None),
     db: Session = Depends(get_session)
 ):
-    return search_users_service(db, name, email)
+    return search_users_service(db, first_name, whatsapp)
 
 def patch_user(user_id: int, data: UserPatch, db: Session = Depends(get_session)):
     return patch_user_service(db, user_id, data)
