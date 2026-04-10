@@ -110,22 +110,20 @@ def delete_user_service(db: Session, user_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete user: {str(e)}")
 
-
-def search_users_service(db: Session, name: str = None, email: str = None):
+def search_users_service(db: Session, first_name: str = None, whatsapp: str = None):
     try:
         query = select(User)
 
-        if name:
-            query = query.where(User.name.contains(name))
+        if first_name:
+            query = query.where(User.first_name.contains(first_name))
 
-        if email:
-            query = query.where(User.email.contains(email))
+        if whatsapp:
+            query = query.where(User.whatsapp.contains(whatsapp))
 
         return db.exec(query).all()
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
-
 
 def patch_user_service(db: Session, user_id: int, data):
     try:
@@ -136,14 +134,14 @@ def patch_user_service(db: Session, user_id: int, data):
 
         update_data = data.model_dump(exclude_unset=True)
 
-        if "name" in update_data:
-            if not update_data["name"] or update_data["name"].strip() == "":
-                raise HTTPException(status_code=400, detail="Name cannot be empty")
+        if "first_name" in update_data:
+            if not update_data["first_name"] or update_data["first_name"].strip() == "":
+             raise HTTPException(status_code=400, detail="First name cannot be empty")
 
-        if "email" in update_data:
-            if "@" not in update_data["email"]:
-                raise HTTPException(status_code=400, detail="Invalid email format")
-
+        if "whatsapp" in update_data:
+            if not update_data["whatsapp"].isdigit():
+             raise HTTPException(status_code=400, detail="Whatsapp must be numeric")
+        
         for key, value in update_data.items():
             setattr(user, key, value)
 
