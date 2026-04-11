@@ -1,5 +1,6 @@
 from sqlmodel import Session, select
-from src.database.schema import User
+from src.database.schema.schema import User
+
 
 def create_user(db: Session, user: User):
     db.add(user)
@@ -15,6 +16,17 @@ def get_all_users(db: Session):
 
 def get_user_by_id(db: Session, user_id: int):
     return db.get(User, user_id)
+
+
+# 🔥 TAMBAHAN (UNTUK REGISTER)
+def get_user_by_email(db: Session, email: str):
+    statement = select(User).where(User.email == email)
+    return db.exec(statement).first()
+
+
+def get_user_by_username(db: Session, username: str):
+    statement = select(User).where(User.username == username)
+    return db.exec(statement).first()
 
 
 def update_user(db: Session, user_id: int, user_data: dict):

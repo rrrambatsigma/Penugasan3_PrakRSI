@@ -1,6 +1,6 @@
 from sqlmodel import Session
 from fastapi import HTTPException
-from src.database.schema import Role
+from src.database.schema.schema import Role
 from src.repositories.role_repository import (
     create_role,
     get_all_roles,
