@@ -11,8 +11,8 @@ from sqlmodel import SQLModel
 
 # --- BAGIAN KRUSIAL: IMPORT MODEL ---
 # Kita harus mengimport schema agar SQLModel.metadata terisi dengan definisi tabel
-from src.database.schema.schema import Role, Account, User, Event, Registration
 # ------------------------------------
+from src.database.schema.schema import RoleEnum, User, Account
 
 # Objek Config Alembic, yang menyediakan akses ke nilai dalam file .ini.
 config = context.config
@@ -23,7 +23,6 @@ if config.config_file_name is not None:
 
 # Tambahkan objek MetaData model di sini untuk dukungan 'autogenerate'
 target_metadata = SQLModel.metadata
-
 
 def run_migrations_offline() -> None:
     """Jalankan migrasi dalam mode 'offline'."""

@@ -12,33 +12,20 @@ from src.repositories.user_repository import (
 
 def create_user_service(db: Session, user_data):
     try:
-        if not user_data.first_name or user_data.first_name.strip() == "":
-            raise HTTPException(status_code=400, detail="First name is required")
-
-        if not user_data.whatsapp or user_data.whatsapp.strip() == "":
-            raise HTTPException(status_code=400, detail="Whatsapp is required")
-
-        if not user_data.whatsapp.isdigit():
-            raise HTTPException(status_code=400, detail="Whatsapp must be numeric")
-
-        if len(user_data.whatsapp) < 10:
-            raise HTTPException(status_code=400, detail="Whatsapp number is too short")
-
-        now = datetime.now()
-        user = User(
-            **user_data.dict(),
-            created_at=now,
-            updated_at=now,
+        # ❌ BLOCK endpoint ini untuk create user auth
+        raise HTTPException(
+            status_code=400,
+            detail="Gunakan endpoint /auth/register untuk membuat user"
         )
-
-        return create_user(db, user)
 
     except HTTPException as e:
         raise e
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
-
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create user: {str(e)}"
+        )
 
 def update_user_service(db: Session, user_id: int, user_data):
     try:
