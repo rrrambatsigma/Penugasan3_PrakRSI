@@ -3,7 +3,7 @@ from sqlmodel import SQLModel, Session, create_engine
 DATABASE_URL = "postgresql://mahasiswa-rsi:praktikum-rsi@localhost:5433/acara-rsi"
 
 # Create engine untuk SQLModel
-engine = create_engine(DATABASE_URL, echo=True)  # echo=True untuk debug query
+engine = create_engine(DATABASE_URL, echo=False)  # echo=True untuk debug query
 
 # Dependency session untuk router/service
 def get_session():
