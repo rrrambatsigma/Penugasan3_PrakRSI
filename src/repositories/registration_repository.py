@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from src.database.schema import Registration
+from src.database.schema.schema import Registration
 
 def create_registration(db: Session, registration: Registration):
     db.add(registration)

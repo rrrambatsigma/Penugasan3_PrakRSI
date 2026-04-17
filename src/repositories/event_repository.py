@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from src.database.schema import Event
+from src.database.schema.schema import Event
 
 
 class EventRepository:

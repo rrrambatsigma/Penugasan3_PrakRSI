@@ -5,6 +5,7 @@ from src.database.connection import init_db, engine
 from src.database.schema.schema import Role, RoleEnum
 
 from src.routes.register import router as register_router
+from src.routes.login import router as login_router
 from src.routes import (
     user_router, 
     account_router,
@@ -62,3 +63,4 @@ app.include_router(event_router.router)
 app.include_router(registration_router.router)
 app.include_router(register.router)
 app.include_router(register_router)
+app.include_router(login_router)
