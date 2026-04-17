@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from src.database.schema import Account
+from src.database.schema.schema import Account
 
 
 def create_account(db: Session, account: Account):
