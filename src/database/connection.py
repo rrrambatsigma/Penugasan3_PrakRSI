@@ -1,9 +1,21 @@
 from sqlmodel import SQLModel, Session, create_engine
+import os
+from dotenv import load_dotenv
 
-DATABASE_URL = "postgresql://mahasiswa-rsi:praktikum-rsi@localhost:5433/acara-rsi"
+# 1. Panggil fungsi untuk membaca file .env
+load_dotenv()
 
-# Create engine untuk SQLModel
-engine = create_engine(DATABASE_URL, echo=False)  # echo=True untuk debug query
+# 2. Ambil URL dari environment variable
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# 3. Validasi (Biar tidak error NoneType)
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL tidak ditemukan di file .env! Pastikan file .env ada di root folder.")
+
+engine = create_engine(DATABASE_URL)
+
+def init_db():
+    SQLModel.metadata.create_all(engine)
 
 # Dependency session untuk router/service
 def get_session():
