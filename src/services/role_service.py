@@ -1,123 +1,74 @@
-from sqlmodel import Session
-from fastapi import HTTPException
-from src.database.schema.schema import Role
-from src.repositories.role_repository import (
-    create_role,
-    get_all_roles,
-    get_role_by_id,
-    delete_role
+from fastapi import Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
+from starlette import status
+
+from src.database.schema.schema import Role, RoleEnum
+from src.dto.role import (
+    RoleCreate,
+    RoleCreateResponse,
+    RoleDeleteResponse,
+    RoleDetailResponse,
+    RoleListResponse,
+    RolePatch,
+    RoleRead,
+    RoleUpdate,
+    RoleUpdateResponse,
 )
-
-def create_role_service(db: Session, data):
-    try:
-        if not data.name or data.name.strip() == "":
-            raise HTTPException(status_code=400, detail="Role name is required")
-
-        # OPTIONAL: normalize
-        data.name = data.name.strip()
-
-        role = Role(**data.model_dump())
-        return create_role(db, role)
-
-    except HTTPException as e:
-        raise e
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create role: {str(e)}")
+from src.repositories.role_repository import RoleRepository
 
 
-def get_all_roles_service(db: Session):
-    try:
-        return get_all_roles(db)
+class RoleService:
+    def __init__(self, role_repository: RoleRepository = Depends(RoleRepository)):
+        self.role_repository = role_repository
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch roles: {str(e)}")
+    def create_role(self, data: RoleCreate) -> RoleCreateResponse:
+        if self.role_repository.get_by_name(data.name):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"code": status.HTTP_409_CONFLICT, "data": None, "message": "Role sudah ada"})
+        role = self.role_repository.create(Role(name=data.name))
+        return RoleCreateResponse(code=status.HTTP_201_CREATED, message="Role berhasil dibuat.", data=RoleRead.model_validate(role))
 
+    def get_roles(self) -> RoleListResponse:
+        roles = self.role_repository.get_all()
+        return RoleListResponse(code=status.HTTP_200_OK, message="Data role berhasil diambil.", data=[RoleRead.model_validate(role) for role in roles])
 
-def get_role_by_id_service(db: Session, role_id: int):
-    try:
-        role = get_role_by_id(db, role_id)
-
+    def get_role_by_name(self, role_name: RoleEnum) -> RoleDetailResponse:
+        role = self.role_repository.get_by_name(role_name)
         if not role:
-            raise HTTPException(status_code=404, detail="Role not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": status.HTTP_404_NOT_FOUND, "data": None, "message": "Role tidak ditemukan"})
+        return RoleDetailResponse(code=status.HTTP_200_OK, message="Data role berhasil diambil.", data=RoleRead.model_validate(role))
 
-        return role
-
-    except HTTPException as e:
-        raise e
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching role: {str(e)}")
-
-
-def delete_role_service(db: Session, role_id: int):
-    try:
-        role = get_role_by_id(db, role_id)
-
+    def update_role(self, role_name: RoleEnum, data: RoleUpdate) -> RoleUpdateResponse:
+        role = self.role_repository.get_by_name(role_name)
         if not role:
-            raise HTTPException(status_code=404, detail="Role not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": status.HTTP_404_NOT_FOUND, "data": None, "message": "Role tidak ditemukan"})
+        if data.name != role.name and self.role_repository.get_by_name(data.name):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"code": status.HTTP_409_CONFLICT, "data": None, "message": "Nama role sudah digunakan"})
 
-        delete_role(db, role)
-        return {"message": "Role deleted successfully"}
+        role.name = data.name
+        try:
+            role = self.role_repository.update(role)
+        except IntegrityError:
+            self.role_repository.session.rollback()
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"code": status.HTTP_400_BAD_REQUEST, "data": None, "message": "Role tidak dapat diubah karena masih dipakai oleh akun"})
 
-    except HTTPException as e:
-        raise e
+        return RoleUpdateResponse(code=status.HTTP_200_OK, message="Role berhasil diupdate.", data=RoleRead.model_validate(role))
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete role: {str(e)}")
-
-
-def update_role_service(db: Session, role_id: int, data):
-    try:
-        role = get_role_by_id(db, role_id)
-
-        if not role:
-            raise HTTPException(status_code=404, detail="Role not found")
-
-        if not data.name or data.name.strip() == "":
-            raise HTTPException(status_code=400, detail="Role name cannot be empty")
-
-        role.name = data.name.strip()
-
-        db.add(role)
-        db.commit()
-        db.refresh(role)
-
-        return role
-
-    except HTTPException as e:
-        raise e
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update role: {str(e)}")
-
-
-def patch_role_service(db: Session, role_id: int, data):
-    try:
-        role = get_role_by_id(db, role_id)
-
-        if not role:
-            raise HTTPException(status_code=404, detail="Role not found")
-
+    def patch_role(self, role_name: RoleEnum, data: RolePatch) -> RoleUpdateResponse:
         update_data = data.model_dump(exclude_unset=True)
+        role = self.role_repository.get_by_name(role_name)
+        if not role:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": status.HTTP_404_NOT_FOUND, "data": None, "message": "Role tidak ditemukan"})
+        if "name" not in update_data:
+            return RoleUpdateResponse(code=status.HTTP_200_OK, message="Role tidak berubah.", data=RoleRead.model_validate(role))
+        return self.update_role(role_name, RoleUpdate(name=update_data["name"]))
 
-        if "name" in update_data:
-            if not update_data["name"] or update_data["name"].strip() == "":
-                raise HTTPException(status_code=400, detail="Role name cannot be empty")
-
-            update_data["name"] = update_data["name"].strip()
-
-        for key, value in update_data.items():
-            setattr(role, key, value)
-
-        db.add(role)
-        db.commit()
-        db.refresh(role)
-
-        return role
-
-    except HTTPException as e:
-        raise e
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to patch role: {str(e)}")
+    def delete_role(self, role_name: RoleEnum) -> RoleDeleteResponse:
+        role = self.role_repository.get_by_name(role_name)
+        if not role:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"code": status.HTTP_404_NOT_FOUND, "data": None, "message": "Role tidak ditemukan"})
+        try:
+            self.role_repository.delete(role)
+        except IntegrityError:
+            self.role_repository.session.rollback()
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"code": status.HTTP_400_BAD_REQUEST, "data": None, "message": "Role tidak dapat dihapus karena masih dipakai oleh akun"})
+        return RoleDeleteResponse(code=status.HTTP_200_OK, message="Role berhasil dihapus.", data=None)

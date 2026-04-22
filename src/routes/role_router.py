@@ -1,48 +1,40 @@
-from fastapi import APIRouter, Depends
-from src.controllers import role_controller
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Path, Response
+
+from src.controllers.role_controller import RoleController
+from src.database.schema.schema import RoleEnum
+from src.dto.role import RoleCreate, RolePatch, RoleUpdate
 from src.utils.auth import require_role
-from src.database.schema.schema import User, RoleEnum
-from src.dto.role import RoleCreate
+
+role_router = APIRouter(prefix="/roles", tags=["Roles"])
 
 
-router = APIRouter(prefix="/roles", tags=["Roles"])
-
-@router.post("/")
-def create_role(request: RoleCreate):
-    return role_controller.create_role(request)
-
-@router.get("/")
-def get_roles():
-    return role_controller.get_roles()
-
-@router.get("/{role_id}")
-def get_role(role_id: int):
-    return role_controller.get_role(role_id)
+# @role_router.post("/", dependencies=[Depends(require_role([RoleEnum.ADMIN]))])
+# def create_role(req_body: RoleCreate, controller: RoleController = Depends(RoleController)) -> Response:
+#     return controller.create_role(req_body)
 
 
-@router.post("/")
-def create_role(
-    user: User = Depends(require_role([RoleEnum.ADMIN]))
-):
-    return role_controller.create_role()
+@role_router.get("/", dependencies=[Depends(require_role([RoleEnum.ADMIN]))])
+def get_roles(controller: RoleController = Depends(RoleController)) -> Response:
+    return controller.get_roles()
 
-@router.put("/{role_id}")
-def update_role(
-    role_id: int,
-    user: User = Depends(require_role([RoleEnum.ADMIN]))
-):
-    return role_controller.update_role(role_id)
 
-@router.delete("/{role_id}")
-def delete_role(
-    role_id: int,
-    user: User = Depends(require_role([RoleEnum.ADMIN]))
-):
-    return role_controller.delete_role(role_id)
+# @role_router.get("/{role_name}", dependencies=[Depends(require_role([RoleEnum.ADMIN]))])
+# def get_role(role_name: Annotated[RoleEnum, Path(title="Nama role")], controller: RoleController = Depends(RoleController)) -> Response:
+#     return controller.get_role(role_name)
 
-@router.patch("/{role_id}")
-def patch_role(
-    role_id: int,
-    user: User = Depends(require_role([RoleEnum.ADMIN]))
-):
-    return role_controller.patch_role(role_id)
+
+# @role_router.put("/{role_name}", dependencies=[Depends(require_role([RoleEnum.ADMIN]))])
+# def update_role(role_name: Annotated[RoleEnum, Path(title="Nama role yang ingin diupdate")], req_body: RoleUpdate, controller: RoleController = Depends(RoleController)) -> Response:
+#     return controller.update_role(role_name, req_body)
+
+
+# @role_router.patch("/{role_name}", dependencies=[Depends(require_role([RoleEnum.ADMIN]))])
+# def patch_role(role_name: Annotated[RoleEnum, Path(title="Nama role yang ingin diupdate")], req_body: RolePatch, controller: RoleController = Depends(RoleController)) -> Response:
+#     return controller.patch_role(role_name, req_body)
+
+
+# @role_router.delete("/{role_name}", dependencies=[Depends(require_role([RoleEnum.ADMIN]))])
+# def delete_role(role_name: Annotated[RoleEnum, Path(title="Nama role yang ingin dihapus")], controller: RoleController = Depends(RoleController)) -> Response:
+#     return controller.delete_role(role_name)

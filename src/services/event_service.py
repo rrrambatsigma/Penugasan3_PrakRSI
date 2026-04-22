@@ -1,103 +1,107 @@
-from sqlmodel import Session, select
-from src.repositories.event_repository import EventRepository
-from src.database.schema import Event
+import uuid
 from datetime import datetime
-from fastapi import HTTPException
-from datetime import datetime, timezone
+
+from fastapi import Depends, HTTPException
+from starlette import status
+
+from src.database.schema.schema import Event
+from src.dto.event import (
+    CreateEventRequest,
+    CreateEventResponse,
+    DeleteEventResponse,
+    EventRead,
+    GetEventByIdResponse,
+    GetEventsResponse,
+    UpdateEventRequest,
+    UpdateEventResponse,
+)
+from src.repositories.event_repository import EventRepository
 
 
 class EventService:
+    def __init__(self, event_repository: EventRepository = Depends(EventRepository)):
+        self.event_repository = event_repository
 
-    def __init__(self):
-        self.repo = EventRepository()
+    def create_event(self, data: CreateEventRequest) -> CreateEventResponse:
+        event = self.event_repository.create(
+            Event(
+                name=data.name,
+                description=data.description,
+                quota=data.quota,
+                started_at=data.start_date,
+                ended_at=data.end_date,
+            )
+        )
+        return CreateEventResponse(
+            code=status.HTTP_201_CREATED,
+            data=EventRead.model_validate(event),
+            message="Event berhasil ditambahkan",
+        )
 
-    def get_events(self, db: Session):
-        try:
-            return self.repo.get_all(db)
-        except Exception as e:
-            raise HTTPException(500, f"Failed to fetch events: {str(e)}")
+    def get_events(self) -> GetEventsResponse:
+        events = self.event_repository.get_all()
+        return GetEventsResponse(
+            code=status.HTTP_200_OK,
+            message="Data event berhasil diambil.",
+            data=[EventRead.model_validate(event) for event in events],
+        )
 
-    def get_event(self, db: Session, event_id: int):
-        try:
-            event = self.repo.get_by_id(db, event_id)
+    def get_event_by_id(self, event_id: uuid.UUID) -> GetEventByIdResponse:
+        event = self.event_repository.get_by_id(event_id)
+        if not event:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": status.HTTP_404_NOT_FOUND, "data": None, "message": "Event tidak ditemukan"},
+            )
+        return GetEventByIdResponse(
+            code=status.HTTP_200_OK,
+            data=EventRead.model_validate(event),
+            message="Data event berhasil diambil.",
+        )
 
-            if not event:
-                raise HTTPException(404, "Event not found")
-
-            return event
-
-        except HTTPException as e:
-            raise e
-        except Exception as e:
-            raise HTTPException(500, f"Error fetching event: {str(e)}")
-
-
-    def create_event(self, db: Session, data):
-        try:
-            now = datetime.now(timezone.utc)
-
-            if not data.name or data.name.strip() == "":
-                raise HTTPException(400, "Event name is required")
-
-            if not data.description or data.description.strip() == "":
-                raise HTTPException(400, "Description is required")
-
-            if data.started_at < now:
-                raise HTTPException(400, "Event start time cannot be in the past")
-
-            if data.ended_at <= data.started_at:
-                raise HTTPException(400, "End time must be after start time")
-
-            event = Event(
-                **data.dict(),
-                created_at=now,
-                updated_at=now
+    def update_event(self, event_id: uuid.UUID, data: UpdateEventRequest) -> UpdateEventResponse:
+        event = self.event_repository.get_by_id(event_id)
+        if not event:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": status.HTTP_404_NOT_FOUND, "data": None, "message": "Event tidak ditemukan"},
             )
 
-            return self.repo.create(db, event)
+        update_data = data.model_dump(exclude_unset=True)
+        if "start_date" in update_data:
+            event.started_at = update_data.pop("start_date")
+        if "end_date" in update_data:
+            event.ended_at = update_data.pop("end_date")
 
-        except HTTPException as e:
-            raise e
-        except Exception as e:
-            raise HTTPException(500, f"Failed to create event: {str(e)}")
+        for key, value in update_data.items():
+            setattr(event, key, value)
 
-    def update_event(self, db: Session, event_id: int, data):
-        try:
-            now = datetime.now()
-            event = self.repo.get_by_id(db, event_id)
+        if event.ended_at <= event.started_at:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": status.HTTP_400_BAD_REQUEST, "data": None, "message": "end_date harus lebih besar dari start_date"},
+            )
 
-            if not event:
-                raise HTTPException(404, "Event not found")
+        event.updated_at = datetime.now()
+        self.event_repository.update(event_id, event)
 
-            # 🔥 FIX TIMEZONE
-            if data.started_at:
-                data.started_at = data.started_at.replace(tzinfo=None)
+        return UpdateEventResponse(
+            code=status.HTTP_200_OK,
+            message="Data event berhasil diupdate.",
+            data=EventRead.model_validate(event),
+        )
 
-            if data.ended_at:
-                data.ended_at = data.ended_at.replace(tzinfo=None)
+    def delete_event(self, event_id: uuid.UUID) -> DeleteEventResponse:
+        event = self.event_repository.get_by_id(event_id)
+        if not event:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": status.HTTP_404_NOT_FOUND, "data": None, "message": "Event tidak ditemukan"},
+            )
 
-            if not data.name or data.name.strip() == "":
-                raise HTTPException(400, "Event name cannot be empty")
-
-            if not data.description or data.description.strip() == "":
-                raise HTTPException(400, "Description cannot be empty")
-
-            if data.started_at < now:
-                raise HTTPException(400, "Event start time cannot be in the past")
-
-            if data.ended_at <= data.started_at:
-                raise HTTPException(400, "End time must be after start time")
-
-            event.name = data.name
-            event.description = data.description
-            event.quota = data.quota
-            event.started_at = data.started_at
-            event.ended_at = data.ended_at
-            event.updated_at = now
-
-            return self.repo.update(db, event)
-
-        except HTTPException as e:
-            raise e
-        except Exception as e:
-            raise HTTPException(500, f"Failed to update event: {str(e)}")
+        self.event_repository.delete(event_id)
+        return DeleteEventResponse(
+            code=status.HTTP_200_OK,
+            message="Data event berhasil dihapus.",
+            data=None,
+        )

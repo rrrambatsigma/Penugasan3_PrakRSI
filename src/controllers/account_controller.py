@@ -1,31 +1,34 @@
-from fastapi import Depends
-from sqlmodel import Session
+import uuid
 
-from src.database.connection import get_session
+from fastapi import Depends, Response
+
 from src.dto.account import AccountCreate, AccountPatch
-from src.services.account_service import (
-    create_account_service,
-    get_all_accounts_service,
-    get_account_by_id_service,
-    delete_account_service,
-    patch_account_service
-)
+from src.services.account_service import AccountService
 
 
-def get_accounts(db: Session = Depends(get_session)):
-    return get_all_accounts_service(db)
+def json_response(result) -> Response:
+    return Response(
+        status_code=result.code,
+        content=result.model_dump_json(),
+        media_type="application/json",
+    )
 
 
-def get_account(account_id: int, db: Session = Depends(get_session)):
-    return get_account_by_id_service(db, account_id)
+class AccountController:
+    def __init__(self, account_service: AccountService = Depends(AccountService)):
+        self.account_service = account_service
 
+    def get_accounts(self) -> Response:
+        return json_response(self.account_service.get_accounts())
 
-def create_account(data: AccountCreate, db: Session = Depends(get_session)):
-    return create_account_service(db, data)
+    def get_account(self, account_id: uuid.UUID) -> Response:
+        return json_response(self.account_service.get_account_by_id(account_id))
 
+    def create_account(self, data: AccountCreate) -> Response:
+        return json_response(self.account_service.create_account(data))
 
-def delete_account(account_id: int, db: Session = Depends(get_session)):
-    return delete_account_service(db, account_id)
+    def delete_account(self, account_id: uuid.UUID) -> Response:
+        return json_response(self.account_service.delete_account(account_id))
 
-def patch_account(account_id: int, data: AccountPatch, db: Session = Depends(get_session)):
-    return patch_account_service(db, account_id, data)
+    def patch_account(self, account_id: uuid.UUID, data: AccountPatch) -> Response:
+        return json_response(self.account_service.patch_account(account_id, data))

@@ -1,55 +1,44 @@
-from fastapi import APIRouter, Depends
-from sqlmodel import Session
-from src.database.connection import get_session
-from src.utils.auth import require_role, RoleEnum
-from src.dto.registration import RegistrationCreate, RegistrationResponse
-from src.controllers import registration_controller
-from src.utils.auth import get_current_user
-from src.database.schema.schema import User
+import uuid
+from typing import Annotated
 
-router = APIRouter(prefix="/registrations", tags=["Registrations"])
+from fastapi import APIRouter, Depends, Path, Query, Response
+
+from src.controllers.registration_controller import RegistrationController
+from src.database.schema.schema import RoleEnum, User
+from src.dto.registration import RegistrationCreate
+from src.utils.auth import get_current_user, require_role
+
+registration_router = APIRouter(prefix="/registrations", tags=["Registrations"])
 
 
-@router.post("/", response_model=RegistrationResponse,
-             dependencies=[Depends(require_role([RoleEnum.USER]))])
+@registration_router.post("/", dependencies=[Depends(get_current_user)])
 def create_registration(
-    data: RegistrationCreate,
-    user: User = Depends(require_role([RoleEnum.USER]))
-):
-    return registration_controller.create_registration(data, user)
+    req_body: RegistrationCreate,
+    current_user: User = Depends(get_current_user),
+    controller: RegistrationController = Depends(RegistrationController),
+) -> Response:
+    return controller.create_registration(req_body, current_user=current_user)
 
-# HARUS LOGIN
-@router.get("/")
-def get_registrations(
-    user: User = Depends(get_current_user)
-):
-    return registration_controller.get_registrations()
 
-@router.get("/{registration_id}")
-def get_registration(
-    registration_id: int,
-    user: User = Depends(get_current_user)
-):
-    return registration_controller.get_registration(registration_id)
+@registration_router.get("/", dependencies=[Depends(require_role([RoleEnum.ADMIN]))])
+def get_registrations(controller: RegistrationController = Depends(RegistrationController)) -> Response:
+    return controller.get_registrations()
 
-@router.get("/search")
+
+@registration_router.get("/search", dependencies=[Depends(require_role([RoleEnum.ADMIN]))])
 def search_registrations(
-    user: User = Depends(get_current_user)
-):
-    return registration_controller.search_registrations()
+    user_id: uuid.UUID | None = Query(default=None),
+    event_id: uuid.UUID | None = Query(default=None),
+    controller: RegistrationController = Depends(RegistrationController),
+) -> Response:
+    return controller.search_registrations(user_id=user_id, event_id=event_id)
 
 
-# ADMIN ONLY
-@router.delete("/{registration_id}")
-def delete_registration(
-    registration_id: int,
-    user: User = Depends(require_role([RoleEnum.ADMIN]))
-):
-    return registration_controller.delete_registration(registration_id)
+@registration_router.get("/{registration_id}", dependencies=[Depends(get_current_user)])
+def get_registration(registration_id: Annotated[uuid.UUID, Path(title="ID registrasi yang ingin diambil")], controller: RegistrationController = Depends(RegistrationController)) -> Response:
+    return controller.get_registration(registration_id)
 
-@router.patch("/{registration_id}")
-def patch_registration(
-    registration_id: int,
-    user: User = Depends(require_role([RoleEnum.ADMIN]))
-):
-    return registration_controller.patch_registration(registration_id)
+
+@registration_router.delete("/{registration_id}", dependencies=[Depends(require_role([RoleEnum.ADMIN]))])
+def delete_registration(registration_id: Annotated[uuid.UUID, Path(title="ID registrasi yang ingin dihapus")], controller: RegistrationController = Depends(RegistrationController)) -> Response:
+    return controller.delete_registration(registration_id)

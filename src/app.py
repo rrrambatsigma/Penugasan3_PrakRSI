@@ -1,66 +1,65 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from sqlmodel import Session, select
 
-from src.database.connection import init_db, engine
+from src.database.connection import engine, init_db
 from src.database.schema.schema import Role, RoleEnum
-
-from src.routes.register import router as register_router
-from src.routes.login import router as login_router
-from src.routes import (
-    user_router, 
-    account_router,
-    role_router,
-    registration_router,
-    event_router,
-    register
-)
-
-app = FastAPI(title="Acara RSI API")
+from src.middlewares.auth import AuthMiddleware, ProtectedRoute
+from src.middlewares.error import register_exception_handlers
+from src.routes.account_router import account_router
+from src.routes.auth import auth_router
+from src.routes.event_router import event_router
+from src.routes.registration_router import registration_router
+from src.routes.role_router import role_router
+from src.routes.user_router import user_router
 
 
-# =========================
-# INIT DB
-# =========================
-init_db()
-
-
-# =========================
-# SEED ROLE (AUTO)
-# =========================
-def seed_roles():
+def seed_roles() -> None:
     with Session(engine) as db:
         for role_name in RoleEnum:
-            existing = db.exec(
-                select(Role).where(Role.name == role_name)
-            ).first()
-
+            existing = db.exec(select(Role).where(Role.name == role_name)).first()
             if not existing:
                 db.add(Role(name=role_name))
-
         db.commit()
 
 
-@app.on_event("startup")
-def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
     seed_roles()
+    print("Application is starting up")
+    yield
+    print("Application is shutting down")
 
 
-# =========================
-# ROOT
-# =========================
+app = FastAPI(title="Acara RSI API", lifespan=lifespan)
+
+register_exception_handlers(app)
+
+app.add_middleware(
+    AuthMiddleware,
+    protected_routes=[
+        ProtectedRoute("/logout", ["POST"]),
+    ],
+    admin_routes=[
+        ProtectedRoute("/events", ["POST", "PATCH", "DELETE"]),
+        ProtectedRoute("/accounts", ["GET", "POST", "PATCH", "DELETE"]),
+        ProtectedRoute("/roles", ["GET", "POST", "PUT", "PATCH", "DELETE"]),
+        ProtectedRoute("/users", ["GET", "POST", "PUT", "PATCH", "DELETE"]),
+        ProtectedRoute("/registrations", ["GET", "PATCH", "DELETE"]),
+    ],
+)
+
+
 @app.get("/")
 def root():
     return {"message": "API is running 🚀"}
 
 
-# =========================
-# ROUTES
-# =========================
-app.include_router(role_router.router)
-app.include_router(user_router.router)
-app.include_router(account_router.router)
-app.include_router(event_router.router)
-app.include_router(registration_router.router)
-app.include_router(register.router)
-app.include_router(register_router)
-app.include_router(login_router)
+app.include_router(auth_router)
+app.include_router(account_router)
+app.include_router(event_router)
+app.include_router(user_router)
+app.include_router(role_router)
+app.include_router(registration_router)

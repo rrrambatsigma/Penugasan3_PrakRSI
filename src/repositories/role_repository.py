@@ -1,45 +1,41 @@
+from typing import Sequence
+
+from fastapi import Depends
 from sqlmodel import Session, select
-from sqlalchemy.exc import IntegrityError
-from fastapi import HTTPException
 
-from src.database.schema.schema import Role
-from src.database.schema.schema import RoleEnum
+from src.database.connection import get_session
+from src.database.schema.schema import Role, RoleEnum
 
 
-def create_role(db: Session, role: Role):
-    db.add(role)
-    db.commit()
-    db.refresh(role)
-    return role
+def normalize_role_name(name: RoleEnum | str) -> RoleEnum:
+    if isinstance(name, RoleEnum):
+        return name
+    return RoleEnum(name.upper())
 
 
-def get_all_roles(db: Session):
-    return db.exec(select(Role)).all()
+class RoleRepository:
+    def __init__(self, session: Session = Depends(get_session)) -> None:
+        self.session = session
 
+    def create(self, role: Role) -> Role:
+        self.session.add(role)
+        self.session.commit()
+        self.session.refresh(role)
+        return role
 
-def get_role_by_id(db: Session, role_id: int):
-    return db.get(Role, role_id)
+    def get_all(self) -> Sequence[Role]:
+        return self.session.exec(select(Role)).all()
 
+    def get_by_name(self, name: RoleEnum | str) -> Role | None:
+        role_name = normalize_role_name(name)
+        return self.session.exec(select(Role).where(Role.name == role_name)).first()
 
-# 🔥 TAMBAHAN (UMUM DIPAKAI DI REGISTER)
-def get_role_by_name(db: Session, role_name: str):
-    statement = select(Role).where(Role.name == role_name)
-    return db.exec(statement).first()
+    def update(self, role: Role) -> Role:
+        self.session.add(role)
+        self.session.commit()
+        self.session.refresh(role)
+        return role
 
-
-def delete_role(db: Session, role: Role):
-    try:
-        db.delete(role)
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail="Role masih digunakan di tabel lain"
-        )
-
-
-# 🔥 KHUSUS REGISTER (DEFAULT USER)
-def get_role_user(db: Session):
-    statement = select(Role).where(Role.name == RoleEnum.USER)
-    return db.exec(statement).first()
+    def delete(self, role: Role) -> None:
+        self.session.delete(role)
+        self.session.commit()

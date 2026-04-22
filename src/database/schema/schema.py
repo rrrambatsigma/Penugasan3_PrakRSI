@@ -1,125 +1,109 @@
-from sqlmodel import SQLModel, Field, Relationship
+import uuid
 from datetime import datetime
-from typing import Optional, List
 from enum import Enum
+from typing import Optional
+
+from sqlalchemy import Column, String
+from sqlmodel import Field, Relationship, SQLModel
 
 
-# =========================
-# ENUM ROLE
-# =========================
 class RoleEnum(str, Enum):
-    ADMIN = "admin"
-    USER = "user"
+    ADMIN = "ADMIN"
+    USER = "USER"
 
 
-# =========================
-# ROLE
-# =========================
 class Role(SQLModel, table=True):
     __tablename__ = "roles"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: RoleEnum = Field(index=True, unique=True)
+    name: RoleEnum = Field(default=RoleEnum.USER, primary_key=True)
 
-    accounts: List["Account"] = Relationship(back_populates="role")
+    accounts: list["Account"] = Relationship(back_populates="role")
 
 
-# =========================
-# USER (AUTH UTAMA 🔥)
-# =========================
 class User(SQLModel, table=True):
     __tablename__ = "users"
+    __table_args__ = {"extend_existing": True}
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+    first_name: str = Field(max_length=255)
+    last_name: str = Field(max_length=255)
+    whatsapp_number: str = Field(max_length=30)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
-    username: str = Field(index=True, max_length=50)
-    email: str = Field(index=True, unique=True)
-    password: str
-
-    first_name: Optional[str] = Field(default=None, max_length=255)
-    last_name: Optional[str] = Field(default=None, max_length=255)
-    whatsapp: Optional[str] = Field(default=None, max_length=30)
-
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-    # 🔥 RELATION
-    account: Optional["Account"] = Relationship(back_populates="user")
-    registrations: List["Registration"] = Relationship(back_populates="user")
+    account: Optional["Account"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"uselist": False},
+    )
+    registrations: list["Registration"] = Relationship(back_populates="user")
 
 
-# =========================
-# ACCOUNT (ROLE HOLDER)
-# =========================
 class Account(SQLModel, table=True):
     __tablename__ = "accounts"
+    __table_args__ = {"extend_existing": True}
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+    user_id: uuid.UUID = Field(foreign_key="users.id", nullable=False, index=True)
+    role_id: RoleEnum = Field(default=RoleEnum.USER, foreign_key="roles.name", nullable=False)
 
-    user_id: int = Field(foreign_key="users.id")
-    role_id: int = Field(foreign_key="roles.id")
+    email: str = Field(
+        sa_column=Column(String(255), nullable=False, unique=True, index=True)
+    )
+    username: str = Field(
+        sa_column=Column(String(16), nullable=False, unique=True, index=True)
+    )
+    password: str = Field(sa_column=Column(String(255), nullable=False))
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    user: Optional["User"] = Relationship(back_populates="account")
-    role: Optional["Role"] = Relationship(back_populates="accounts")
+    user: Optional[User] = Relationship(back_populates="account")
+    role: Optional[Role] = Relationship(back_populates="accounts")
+    logs: list["Log"] = Relationship(back_populates="account")
 
-    logs: List["Log"] = Relationship(back_populates="account")
 
-
-# =========================
-# EVENT
-# =========================
 class Event(SQLModel, table=True):
     __tablename__ = "events"
+    __table_args__ = {"extend_existing": True}
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+    name: str = Field(max_length=255)
+    description: str | None = Field(default=None)
+    quota: int = Field(default=0)
 
-    name: Optional[str] = None
-    description: Optional[str] = None
-    quota: Optional[int] = None
-
-    started_at: Optional[datetime] = None
-    ended_at: Optional[datetime] = None
+    started_at: datetime
+    ended_at: datetime
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    registrations: List["Registration"] = Relationship(back_populates="event")
+    registrations: list["Registration"] = Relationship(back_populates="event")
 
 
-# =========================
-# REGISTRATION
-# =========================
 class Registration(SQLModel, table=True):
     __tablename__ = "registrations"
+    __table_args__ = {"extend_existing": True}
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+    user_id: uuid.UUID = Field(foreign_key="users.id", nullable=False, index=True)
+    event_id: uuid.UUID = Field(foreign_key="events.id", nullable=False, index=True)
 
-    user_id: int = Field(foreign_key="users.id")
-    event_id: int = Field(foreign_key="events.id")
-
-    user: Optional["User"] = Relationship(back_populates="registrations")
-    event: Optional["Event"] = Relationship(back_populates="registrations")
+    user: Optional[User] = Relationship(back_populates="registrations")
+    event: Optional[Event] = Relationship(back_populates="registrations")
 
 
-# =========================
-# LOG
-# =========================
 class Log(SQLModel, table=True):
     __tablename__ = "logs"
+    __table_args__ = {"extend_existing": True}
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+    account_id: uuid.UUID = Field(foreign_key="accounts.id", nullable=False, index=True)
 
-    account_id: int = Field(foreign_key="accounts.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    action: str | None = Field(default=None, max_length=255)
+    ip_address: str | None = Field(default=None, max_length=64)
+    user_agent: str | None = Field(default=None)
+    entity: str | None = Field(default=None, max_length=255)
+    entity_id: str | None = Field(default=None, max_length=64)
 
-    created_at: Optional[datetime] = None
-    action: Optional[str] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-
-    entity: Optional[str] = None
-    entity_id: Optional[int] = None
-
-    account: Optional["Account"] = Relationship(back_populates="logs")
+    account: Optional[Account] = Relationship(back_populates="logs")

@@ -1,53 +1,65 @@
-from fastapi import APIRouter, Depends
-from src.controllers import event_controller
-from src.utils.auth import require_role
-from src.database.schema.schema import User, RoleEnum
-from src.dto.event import EventCreate
-from sqlmodel import Session
-from src.database.connection import get_session
+import uuid
+from typing import Annotated
 
-router = APIRouter(prefix="/events", tags=["Events"])
+from fastapi import APIRouter, Depends, Path, Response, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-# PUBLIC / BEBAS
-@router.get("/")
-def get_events():
-    return event_controller.get_events()
+from src.controllers.event_controller import EventController
+from src.dto.event import (
+    CreateEventRequest,
+    UpdateEventRequest,
+)
 
-@router.get("/search")
-def search_events():
-    return event_controller.search_events()
-
-@router.get("/{event_id}")
-def get_event(event_id: int):
-    return event_controller.get_event(event_id)
+event_router = APIRouter(prefix="/events", tags=["Events"])
 
 
-# ADMIN ONLY
-@router.post("/")
+@event_router.post(
+    "/",
+    status_code=status.HTTP_201_CREATED,
+)
 def create_event(
-    request: EventCreate,
-    db: Session = Depends(get_session),
-    user: User = Depends(require_role([RoleEnum.ADMIN]))
-):
-    return event_controller.create_event(request)
+    req_body: CreateEventRequest,
+    controller: EventController = Depends(EventController),
+    credentials: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+) -> Response:
+    return controller.create_event(req_body)
 
-@router.put("/{event_id}")
+
+@event_router.get("/", status_code=status.HTTP_200_OK)
+def get_events(
+    controller: EventController = Depends(EventController),
+) -> Response:
+    return controller.get_events()
+
+
+@event_router.get("/{event_id}", status_code=status.HTTP_200_OK)
+def get_event(
+    event_id: Annotated[uuid.UUID, Path(title="The ID of the item to get")],
+    controller: EventController = Depends(EventController),
+) -> Response:
+    return controller.get_event_by_id(event_id)
+
+
+@event_router.patch(
+    "/{event_id}",
+    status_code=status.HTTP_200_OK,
+)
 def update_event(
-    event_id: int,
-    user: User = Depends(require_role([RoleEnum.ADMIN]))
-):
-    return event_controller.update_event(event_id)
+    event_id: Annotated[uuid.UUID, Path(title="The ID of the item to update")],
+    req_body: UpdateEventRequest,
+    controller: EventController = Depends(EventController),
+    credentials: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+) -> Response:
+    return controller.update_event(event_id, req_body)
 
-@router.delete("/{event_id}")
+
+@event_router.delete(
+    "/{event_id}",
+    status_code=status.HTTP_200_OK,
+)
 def delete_event(
-    event_id: int,
-    user: User = Depends(require_role([RoleEnum.ADMIN]))
-):
-    return event_controller.delete_event(event_id)
-
-@router.patch("/{event_id}")
-def patch_event(
-    event_id: int,
-    user: User = Depends(require_role([RoleEnum.ADMIN]))
-):
-    return event_controller.patch_event(event_id)
+    event_id: Annotated[uuid.UUID, Path(title="The ID of the item to delete")],
+    controller: EventController = Depends(EventController),
+    credentials: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+) -> Response:
+    return controller.delete_event(event_id)

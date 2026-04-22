@@ -1,50 +1,43 @@
+import uuid
+from typing import Sequence
+
+from fastapi import Depends
 from sqlmodel import Session, select
+
+from src.database.connection import get_session
 from src.database.schema.schema import User
 
 
-def create_user(db: Session, user: User):
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+class UserRepository:
+    def __init__(self, session: Session = Depends(get_session)) -> None:
+        self.session = session
 
+    def create(self, user: User) -> User:
+        self.session.add(user)
+        self.session.commit()
+        self.session.refresh(user)
+        return user
 
-def get_all_users(db: Session):
-    statement = select(User)
-    return db.exec(statement).all()
+    def get_all(self) -> Sequence[User]:
+        return self.session.exec(select(User)).all()
 
+    def get_by_id(self, user_id: uuid.UUID) -> User | None:
+        return self.session.get(User, user_id)
 
-def get_user_by_id(db: Session, user_id: int):
-    return db.get(User, user_id)
+    def search(self, first_name: str | None = None, whatsapp_number: str | None = None) -> Sequence[User]:
+        query = select(User)
+        if first_name:
+            query = query.where(User.first_name.contains(first_name))
+        if whatsapp_number:
+            query = query.where(User.whatsapp_number.contains(whatsapp_number))
+        return self.session.exec(query).all()
 
+    def update(self, user: User) -> User:
+        self.session.add(user)
+        self.session.commit()
+        self.session.refresh(user)
+        return user
 
-# 🔥 TAMBAHAN (UNTUK REGISTER)
-def get_user_by_email(db: Session, email: str):
-    statement = select(User).where(User.email == email)
-    return db.exec(statement).first()
-
-
-def get_user_by_username(db: Session, username: str):
-    statement = select(User).where(User.username == username)
-    return db.exec(statement).first()
-
-
-def update_user(db: Session, user_id: int, user_data: dict):
-    user = db.get(User, user_id)
-
-    if not user:
-        return None
-
-    for key, value in user_data.items():
-        setattr(user, key, value)
-
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
-def delete_user(db: Session, user: User):
-    db.delete(user)
-    db.commit()
-    return True
+    def delete(self, user: User) -> None:
+        self.session.delete(user)
+        self.session.commit()

@@ -1,42 +1,34 @@
-from typing import Optional
-from datetime import datetime
-from fastapi import Depends, Query
-from sqlmodel import Session
+import uuid
 
+from fastapi import Depends, Response
+
+from src.dto.event import CreateEventRequest, UpdateEventRequest
 from src.services.event_service import EventService
-from src.database.connection import get_session
-from src.dto.event import EventCreate, EventPatch
 
 
-service = EventService()
+def json_response(result) -> Response:
+    return Response(
+        status_code=result.code,
+        content=result.model_dump_json(),
+        media_type="application/json",
+    )
 
 
-def get_events(db: Session = Depends(get_session)):
-    return service.get_events(db)
+class EventController:
+    def __init__(self, event_service: EventService = Depends(EventService)):
+        self.event_service = event_service
 
+    def create_event(self, event: CreateEventRequest) -> Response:
+        return json_response(self.event_service.create_event(event))
 
-def get_event(event_id: int, db: Session = Depends(get_session)):
-    return service.get_event(db, event_id)
+    def get_events(self) -> Response:
+        return json_response(self.event_service.get_events())
 
+    def get_event_by_id(self, event_id: uuid.UUID) -> Response:
+        return json_response(self.event_service.get_event_by_id(event_id))
 
-def create_event(data: EventCreate, db: Session = Depends(get_session)):
-    return service.create_event(db, data)
+    def update_event(self, event_id: uuid.UUID, event: UpdateEventRequest) -> Response:
+        return json_response(self.event_service.update_event(event_id, event))
 
-
-def update_event(event_id: int, data: EventCreate, db: Session = Depends(get_session)):
-    return service.update_event(db, event_id, data)
-
-
-def delete_event(event_id: int, db: Session = Depends(get_session)):
-    return service.delete_event(db, event_id)
-
-def search_events(
-    name: Optional[str] = Query(None),
-    started_at: Optional[datetime] = Query(None),
-    ended_at: Optional[datetime] = Query(None),
-    db: Session = Depends(get_session)
-):
-    return service.search_events(db, name, started_at, ended_at)
-
-def patch_event(event_id: int, data: EventPatch, db: Session = Depends(get_session)):
-    return service.patch_event(db, event_id, data)
+    def delete_event(self, event_id: uuid.UUID) -> Response:
+        return json_response(self.event_service.delete_event(event_id))
