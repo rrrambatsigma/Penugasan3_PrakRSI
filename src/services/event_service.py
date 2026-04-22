@@ -3,6 +3,7 @@ from src.repositories.event_repository import EventRepository
 from src.database.schema import Event
 from datetime import datetime
 from fastapi import HTTPException
+from datetime import datetime, timezone
 
 
 class EventService:
@@ -30,18 +31,11 @@ class EventService:
         except Exception as e:
             raise HTTPException(500, f"Error fetching event: {str(e)}")
 
+
     def create_event(self, db: Session, data):
         try:
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
 
-            # 🔥 FIX TIMEZONE (WAJIB)
-            if data.started_at:
-                data.started_at = data.started_at.replace(tzinfo=None)
-
-            if data.ended_at:
-                data.ended_at = data.ended_at.replace(tzinfo=None)
-
-            # VALIDASI
             if not data.name or data.name.strip() == "":
                 raise HTTPException(400, "Event name is required")
 

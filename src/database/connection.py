@@ -8,6 +8,7 @@ load_dotenv()
 # 2. Ambil URL dari environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+engine = create_engine(DATABASE_URL)
 # 3. Validasi (Biar tidak error NoneType)
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL tidak ditemukan di file .env! Pastikan file .env ada di root folder.")

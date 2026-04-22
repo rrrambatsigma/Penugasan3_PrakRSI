@@ -1,12 +1,55 @@
 from fastapi import APIRouter, Depends
-from src.utils.auth import get_current_user
+from sqlmodel import Session
+from src.database.connection import get_session
+from src.utils.auth import require_role, RoleEnum
+from src.dto.registration import RegistrationCreate, RegistrationResponse
 from src.controllers import registration_controller
+from src.utils.auth import get_current_user
+from src.database.schema.schema import User
 
 router = APIRouter(prefix="/registrations", tags=["Registrations"])
 
-router.post("/", dependencies=[Depends(get_current_user)])(registration_controller.create_registration)
-router.get("/", dependencies=[Depends(get_current_user)])(registration_controller.get_registrations)
-router.get("/{registration_id}", dependencies=[Depends(get_current_user)])(registration_controller.get_registration)
-router.delete("/{registration_id}", dependencies=[Depends(get_current_user)])(registration_controller.delete_registration)
-router.get("/search", dependencies=[Depends(get_current_user)])(registration_controller.search_registrations)
-router.patch("/{registration_id}", dependencies=[Depends(get_current_user)])(registration_controller.patch_registration)
+
+@router.post("/", response_model=RegistrationResponse,
+             dependencies=[Depends(require_role([RoleEnum.USER]))])
+def create_registration(
+    data: RegistrationCreate,
+    user: User = Depends(require_role([RoleEnum.USER]))
+):
+    return registration_controller.create_registration(data, user)
+
+# HARUS LOGIN
+@router.get("/")
+def get_registrations(
+    user: User = Depends(get_current_user)
+):
+    return registration_controller.get_registrations()
+
+@router.get("/{registration_id}")
+def get_registration(
+    registration_id: int,
+    user: User = Depends(get_current_user)
+):
+    return registration_controller.get_registration(registration_id)
+
+@router.get("/search")
+def search_registrations(
+    user: User = Depends(get_current_user)
+):
+    return registration_controller.search_registrations()
+
+
+# ADMIN ONLY
+@router.delete("/{registration_id}")
+def delete_registration(
+    registration_id: int,
+    user: User = Depends(require_role([RoleEnum.ADMIN]))
+):
+    return registration_controller.delete_registration(registration_id)
+
+@router.patch("/{registration_id}")
+def patch_registration(
+    registration_id: int,
+    user: User = Depends(require_role([RoleEnum.ADMIN]))
+):
+    return registration_controller.patch_registration(registration_id)
